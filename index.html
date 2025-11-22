@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cronograma: Generador de Imágen de Estatus</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        
+        /* Custom Scrollbar for the chart area */
+        .gantt-scroll::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .gantt-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        .gantt-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .gantt-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        /* Grid Setup */
+        .gantt-grid {
+            display: grid;
+            /* Increased first column width to 320px to accommodate text */
+            grid-template-columns: 320px repeat(var(--days), minmax(50px, 1fr));
+        }
+
+        /* Animations */
+        @keyframes slideIn {
+            from { width: 0; opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .task-bar {
+            animation: slideIn 1s ease-out forwards;
+        }
+
+        /* Tooltip custom styling */
+        .tooltip {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s;
+            position: absolute;
+            z-index: 50;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: 250px;
+        }
+        
+        .task-wrapper:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="text-slate-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 shadow-sm z-20 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900">Generador de Imágen de Estatus</h1>
+                    <p class="text-sm text-slate-500 mt-1">Cronograma del Proceso de Separación de Cuentas | Nov-Dic 2025</p>
+                </div>
+                <div class="flex items-center gap-3 text-sm">
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-500"></span> Dirección</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Áreas Usuario</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-purple-500"></span> Difusión/CAT</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-hidden relative flex flex-col max-w-7xl mx-auto w-full p-4 sm:p-6">
+        
+        <!-- Controls / Legend -->
+        <div class="bg-white rounded-t-xl border border-slate-200 p-4 flex justify-between items-center shadow-sm">
+            <h2 class="font-semibold text-lg text-slate-700">Diagrama de Gantt</h2>
+            <button onclick="scrollToToday()" class="px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-sm font-medium transition-colors">
+                Ir a hoy
+            </button>
+        </div>
+
+        <!-- Gantt Container -->
+        <div class="bg-white border-x border-b border-slate-200 rounded-b-xl shadow-lg flex-1 overflow-hidden flex flex-col">
+            
+            <!-- Header Row (Dates) -->
+            <div class="gantt-scroll overflow-x-auto flex-1 relative" id="gantt-container">
+                <div id="chart-grid" class="gantt-grid min-w-[1000px] border-b border-slate-100">
+                    <!-- JS will populate this -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Footer -->
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="text-slate-500 text-xs uppercase font-bold tracking-wider">Inicio</div>
+                <div class="text-lg font-semibold text-slate-800">21 Nov, 2025</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="text-slate-500 text-xs uppercase font-bold tracking-wider">Finalización</div>
+                <div class="text-lg font-semibold text-slate-800">02 Dic, 2025</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="text-slate-500 text-xs uppercase font-bold tracking-wider">Semana Crítica</div>
+                <div class="text-lg font-semibold text-slate-800 text-indigo-600">Semana 48</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- DATA CONFIGURATION ---
+        const tasks = [
+            {
+                id: 1,
+                title: "1. Solicitud Visto Bueno",
+                area: "Dirección",
+                start: "2025-11-21",
+                end: "2025-11-21",
+                color: "bg-blue-500",
+                desc: "Solicitar visto bueno sem 47 por parte de dirección.",
+                involved: "Dirección General"
+            },
+            {
+                id: 2,
+                title: "2. Recepción Visto Bueno",
+                area: "Dirección",
+                start: "2025-11-24",
+                end: "2025-11-27",
+                color: "bg-blue-400",
+                desc: "Recibir confirmación del visto bueno sem 48.",
+                involved: "Dirección General"
+            },
+            {
+                id: 3,
+                title: "3. Despliegue y Demo",
+                area: "Subdirección Servicios",
+                start: "2025-11-28",
+                end: "2025-11-28",
+                color: "bg-emerald-500",
+                desc: "Bajar herramienta y mostrar el uso de la misma.",
+                involved: "Subdirección de Servicios, Áreas Usuarias"
+            },
+            {
+                id: 4,
+                title: "4. Difusión Mesa de Servicio Operaciones",
+                area: "Primer Nivel / General",
+                start: "2025-12-01",
+                end: "2025-12-01",
+                color: "bg-amber-500",
+                desc: "Presentación formal a primer nivel y comienzo de uso.",
+                involved: "Áreas de Primer Nivel"
+            },
+            {
+                id: 5,
+                title: "5. Difusión CAT",
+                area: "Atención Telefónica",
+                start: "2025-12-02",
+                end: "2025-12-02",
+                color: "bg-purple-500",
+                desc: "Bajar información con el centro de atención para conocimiento.",
+                involved: "CAT (Matutino, Mixto, Vespertino)"
+            }
+        ];
+
+        // --- LOGIC ---
+        
+        // Helper to parse YYYY-MM-DD localized to noon to avoid timezone jumps
+        const parseDate = (str) => new Date(str + 'T12:00:00');
+        
+        // Determine date range (add padding days before/after)
+        const allDates = tasks.flatMap(t => [parseDate(t.start), parseDate(t.end)]);
+        const minDate = new Date(Math.min(...allDates));
+        const maxDate = new Date(Math.max(...allDates));
+        
+        // Add buffer: 2 days before, 2 days after
+        minDate.setDate(minDate.getDate() - 2);
+        maxDate.setDate(maxDate.getDate() + 2);
+
+        // Generate array of days
+        const daysArray = [];
+        let currentDate = new Date(minDate);
+        while (currentDate <= maxDate) {
+            daysArray.push(new Date(currentDate));
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        const container = document.getElementById('chart-grid');
+        // Set CSS variable for grid columns based on days count
+        container.style.setProperty('--days', daysArray.length);
+
+        // 1. RENDER HEADER (Dates)
+        // Empty top-left cell
+        const headerLabel = document.createElement('div');
+        headerLabel.className = "sticky top-0 z-30 bg-slate-50 p-3 border-b border-r border-slate-200 font-bold text-slate-600 flex items-end pb-2";
+        headerLabel.innerHTML = "Fase / Detalles";
+        container.appendChild(headerLabel);
+
+        daysArray.forEach(date => {
+            const cell = document.createElement('div');
+            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+            cell.className = `sticky top-0 z-20 p-2 text-center border-b border-r border-slate-200 flex flex-col justify-end ${isWeekend ? 'bg-slate-100 text-slate-400' : 'bg-white text-slate-700'}`;
+            
+            // Format: Day Number and Day Name
+            const dayName = date.toLocaleDateString('es-MX', { weekday: 'narrow' });
+            const dayNum = date.getDate();
+            const month = date.toLocaleDateString('es-MX', { month: 'short' });
+            
+            cell.innerHTML = `
+                <span class="text-[10px] uppercase text-slate-400">${month}</span>
+                <span class="font-bold text-lg leading-none">${dayNum}</span>
+                <span class="text-xs font-medium mt-1">${dayName}</span>
+            `;
+            container.appendChild(cell);
+        });
+
+        // 2. RENDER GRID BACKGROUND (Rows and vertical lines)
+        // We render the task rows, and for each row, we fill the grid cells
+        tasks.forEach((task, index) => {
+            // Task Label Column (Updated with details)
+            const labelCell = document.createElement('div');
+            labelCell.className = "p-4 border-b border-r border-slate-100 bg-white sticky left-0 z-10 flex flex-col justify-start hover:bg-slate-50 transition-colors";
+            labelCell.innerHTML = `
+                <div class="font-bold text-sm text-slate-900 mb-1">${task.title}</div>
+                <p class="text-xs text-slate-600 mb-2 leading-relaxed">${task.desc}</p>
+                
+                <div class="mt-auto pt-2 border-t border-slate-100">
+                    <div class="text-[10px] uppercase tracking-wide text-slate-400 font-bold mb-0.5">Involucrados:</div>
+                    <div class="text-xs font-medium text-indigo-600 bg-indigo-50 inline-block px-2 py-0.5 rounded">${task.involved}</div>
+                </div>
+            `;
+            container.appendChild(labelCell);
+
+            // Date Columns for this row
+            daysArray.forEach((date, dayIndex) => {
+                const cell = document.createElement('div');
+                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                const dateStr = date.toISOString().split('T')[0];
+                
+                // Removed h-16 fixed height, added min-h-[5rem] to allow row to grow with content
+                cell.className = `relative border-b border-r border-slate-100 min-h-[5rem] ${isWeekend ? 'bg-slate-50' : 'bg-white'}`;
+                
+                // Check if bar starts here
+                if (dateStr === task.start) {
+                    // Calculate span
+                    const startIndex = dayIndex; 
+                    const taskStart = parseDate(task.start);
+                    const taskEnd = parseDate(task.end);
+                    // Difference in days + 1
+                    const duration = (taskEnd - taskStart) / (1000 * 60 * 60 * 24) + 1;
+
+                    const wrapper = document.createElement('div');
+                    wrapper.className = "absolute top-1/2 left-1 h-8 transform -translate-y-1/2 z-10 task-wrapper flex items-center";
+                    
+                    wrapper.style.width = `calc(100% * ${duration} + ${duration - 1}px - 8px)`; 
+                    
+                    wrapper.innerHTML = `
+                        <div class="task-bar w-full h-full rounded shadow-sm ${task.color} flex items-center px-2 cursor-pointer relative hover:brightness-95 transition-all border border-white/20 group">
+                            <!-- Simple Icon/Indicator -->
+                        </div>
+                        
+                        <!-- Tooltip -->
+                        <div class="tooltip bg-slate-800 text-white text-xs rounded-lg py-2 px-3 shadow-xl border border-slate-700 text-left">
+                            <div class="font-bold mb-1 text-indigo-300">${task.title}</div>
+                            <div class="mb-2">${task.desc}</div>
+                             <div class="text-xs text-slate-300 mb-1">👥 ${task.involved}</div>
+                            <div class="text-slate-400 text-[10px] border-t border-slate-600 pt-1 mt-1 flex justify-between gap-4">
+                                <span>Inicio: ${task.start}</span>
+                                <span>Fin: ${task.end}</span>
+                            </div>
+                        </div>
+                    `;
+                    cell.appendChild(wrapper);
+                }
+                
+                container.appendChild(cell);
+            });
+        });
+
+        // Highlight Today (Simulated as Nov 21)
+        const todayStr = "2025-11-21";
+        const todayIndex = daysArray.findIndex(d => d.toISOString().split('T')[0] === todayStr);
+        
+        if (todayIndex !== -1) {
+            const style = document.createElement('style');
+            style.innerHTML = `
+                .gantt-grid > div:nth-child(${daysArray.length + 1}n + ${todayIndex + 2}) {
+                    background-color: #eff6ff !important; 
+                    border-left: 2px dashed #3b82f6;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        function scrollToToday() {
+            const container = document.getElementById('gantt-container');
+            container.scrollTo({ left: 0, behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
